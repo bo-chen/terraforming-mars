@@ -69,6 +69,7 @@ export class GameHandler extends Handler {
           showTimers: gameReq.showTimers,
           fastModeOption: gameReq.fastModeOption,
           showOtherPlayersVP: gameReq.showOtherPlayersVP,
+          cleanSavesOnEnd: gameReq.cleanSavesOnEnd,
 
           corporateEra: gameReq.corporateEra,
           venusNextExtension: gameReq.venusNext,

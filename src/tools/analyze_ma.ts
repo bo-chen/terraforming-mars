@@ -95,6 +95,7 @@ function simpleGameOptions(): GameOptions {
     undoOption: false,
     showTimers: false,
     fastModeOption: false,
+    cleanSavesOnEnd: true,
     showOtherPlayersVP: false,
     corporateEra: false,
     coloniesExtension: false,

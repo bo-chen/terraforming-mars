@@ -84,6 +84,7 @@ export interface GameOptions {
   showTimers: boolean;
   fastModeOption: boolean;
   showOtherPlayersVP: boolean;
+  cleanSavesOnEnd: boolean;
 
   // Extensions
   corporateEra: boolean;
@@ -120,6 +121,7 @@ const DEFAULT_GAME_OPTIONS: GameOptions = {
   aresHazards: true,
   boardName: BoardName.ORIGINAL,
   cardsBlackList: [],
+  cleanSavesOnEnd: true,
   clonedGamedId: undefined,
   coloniesExtension: false,
   communityCardsOption: false,
@@ -1027,7 +1029,9 @@ export class Game implements ISerializable<SerializedGame> {
       this.log('This game id was ' + this.id);
     }
 
-    Database.getInstance().cleanSaves(this.id, this.lastSaveId);
+    if (this.gameOptions.cleanSavesOnEnd) {
+      Database.getInstance().cleanSaves(this.id, this.lastSaveId);
+    }
     const scores: Array<Score> = [];
     this.players.forEach((player) => {
       let corponame: String = '';

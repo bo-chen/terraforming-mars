@@ -36,10 +36,11 @@ export class TestingUtils {
   };
 
   public static setCustomGameOptions(options: Partial<GameOptions> = {}): GameOptions {
-    const defaultOptions = {
+    const defaultOptions : GameOptions = {
       draftVariant: false,
       initialDraftVariant: false,
       corporateEra: true,
+      cleanSavesOnEnd: true,
       randomMA: RandomMAOptionType.NONE,
       preludeExtension: false,
       venusNextExtension: true,
