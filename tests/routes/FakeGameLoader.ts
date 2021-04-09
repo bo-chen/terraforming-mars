@@ -26,7 +26,7 @@ export class FakeGameLoader implements IGameLoader {
   getBySpectatorId(_spectatorId: string, _cb: (game: Game | undefined) => void): void {
     throw new Error('Method not implemented.');
   }
-  restoreGameAt(_gameId: string, _saveId: number, _cb: (game: Game | undefined) => void): void {
+  rollbackGameOnce(_game: Game, _cb: (game: Game | undefined) => void): void {
     throw new Error('Method not implemented.');
   }
 }

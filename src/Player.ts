@@ -1676,8 +1676,8 @@ export class Player implements ISerializable<SerializedPlayer> {
   // Propose a new action to undo last action
   private undoTurnOption(): PlayerInput {
     return new SelectOption('Undo last action', 'Undo', () => {
-      GameLoader.getInstance().restoreGameAt(this.game.id, this.game.lastSaveId - 2, (game) => {
-        if (game !== undefined) {
+      GameLoader.getInstance().rollbackGameOnce(this.game, (revertedGame) => {
+        if (revertedGame !== undefined) {
           this.usedUndo = true; // To prevent going back into takeAction()
         }
       });

@@ -19,5 +19,5 @@ export interface IGameLoader {
   getByGameId(gameId: GameId, bypassCache: boolean, cb: LoadCallback): void;
   getByPlayerId(playerId: PlayerId, cb: LoadCallback): void;
   getBySpectatorId(spectatorId: SpectatorId, cb: LoadCallback): void;
-  restoreGameAt(gameId: GameId, saveId: number, cb: LoadCallback): void;
+  rollbackGameOnce(originalGame: Game, cb: LoadCallback): void;
 }

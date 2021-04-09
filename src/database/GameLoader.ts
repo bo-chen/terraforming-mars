@@ -111,11 +111,11 @@ export class GameLoader implements IGameLoader {
     this.getByParticipantId(spectatorId, cb);
   }
 
-  public restoreGameAt(gameId: GameId, saveId: number, cb: LoadCallback): void {
+  public rollbackGameOnce(originalGame: Game, cb: LoadCallback): void {
     try {
-      Database.getInstance().restoreGame(gameId, saveId, (err, game) => {
+      Database.getInstance().restoreGame(originalGame.id, originalGame.lastSaveId - 2, (err, game) => {
         if (game !== undefined) {
-          Database.getInstance().deleteGameNbrSaves(gameId, 1);
+          Database.getInstance().deleteGameNbrSaves(originalGame.id, 1);
           this.add(game);
           game.undoCount++;
           cb(game);
