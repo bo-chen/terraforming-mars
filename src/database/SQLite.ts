@@ -106,7 +106,7 @@ export class SQLite implements IDatabase {
 
   cleanSaves(game_id: GameId, save_id: number): void {
     // DELETE all saves except initial and last one
-    this.db.run('DELETE FROM games WHERE game_id = ? AND save_id < ? AND save_id > 0', [game_id, save_id], function(err: Error | null) {
+    this.db.run('DELETE FROM games WHERE game_id = ? AND save_id != ? AND save_id != 0', [game_id, save_id], function(err: Error | null) {
       if (err) {
         return console.warn(err.message);
       }
@@ -154,7 +154,7 @@ export class SQLite implements IDatabase {
     // Insert
     this.db.run(
       'INSERT INTO games (game_id, save_id, game, players) VALUES (?, ?, ?, ?) ON CONFLICT (game_id, save_id) DO UPDATE SET game = ?',
-      [game.id, game.lastSaveId, gameJSON, game.getPlayers().length, gameJSON],
+      [game.id, game.saveId + 1, gameJSON, game.getPlayers().length, gameJSON],
       (err: Error | null) => {
         if (err) {
           console.error(err.message);
@@ -164,7 +164,7 @@ export class SQLite implements IDatabase {
     );
 
     // This must occur after the save.
-    game.lastSaveId++;
+    game.saveId++;
   }
 
   deleteGameNbrSaves(game_id: GameId, rollbackCount: number): void {

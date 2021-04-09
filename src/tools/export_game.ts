@@ -25,8 +25,8 @@ db.getGame(gameId, (err: Error | undefined, game?: SerializedGame) => {
     process.exit(1);
   }
 
-  console.log(`Last version is ${game.lastSaveId}`);
-  for (let version = 0; version <= game.lastSaveId; version++) {
+  console.log(`Last version is ${game.saveId}`);
+  for (let version = 0; version <= game.saveId; version++) {
     db.getGameVersion(gameId, version, (_err, serialized) => {
       console.log(`Storing version ${version}`);
       localDb.saveSerializedGame(serialized!);

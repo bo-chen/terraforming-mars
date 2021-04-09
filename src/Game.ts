@@ -153,7 +153,7 @@ const DEFAULT_GAME_OPTIONS: GameOptions = {
 
 export class Game implements ISerializable<SerializedGame> {
   // Game-level data
-  public lastSaveId: number = 0;
+  public saveId: number = 0;
   private clonedGamedId: string | undefined;
   public seed: number;
   public spectatorId: SpectatorId | undefined;
@@ -414,7 +414,7 @@ export class Game implements ISerializable<SerializedGame> {
       generation: this.generation,
       id: this.id,
       initialDraftIteration: this.initialDraftIteration,
-      lastSaveId: this.lastSaveId,
+      saveId: this.saveId,
       milestones: this.milestones,
       monsInsuranceOwner: this.monsInsuranceOwner,
       moonData: IMoonData.serialize(this.moonData),
@@ -1030,7 +1030,7 @@ export class Game implements ISerializable<SerializedGame> {
     }
 
     if (this.gameOptions.cleanSavesOnEnd) {
-      Database.getInstance().cleanSaves(this.id, this.lastSaveId);
+      Database.getInstance().cleanSaves(this.id, this.saveId);
     }
     const scores: Array<Score> = [];
     this.players.forEach((player) => {
@@ -1601,7 +1601,7 @@ export class Game implements ISerializable<SerializedGame> {
       game.unDraftedCards.set(unDraftedCard[0], cardFinder.cardsFromJSON(unDraftedCard[1]));
     });
 
-    game.lastSaveId = d.lastSaveId;
+    game.saveId = d.saveId;
     game.clonedGamedId = d.clonedGamedId;
     game.gameAge = d.gameAge;
     game.gameLog = d.gameLog;

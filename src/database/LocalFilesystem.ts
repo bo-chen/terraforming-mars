@@ -30,15 +30,15 @@ export class Localfilesystem implements IDatabase {
   }
 
   saveGame(game: Game): void {
-    console.log(`saving ${game.id} at position ${game.lastSaveId}`);
+    game.saveId++;
+    console.log(`saving ${game.id} at position ${game.saveId}`);
     this.saveSerializedGame(game.serialize());
-    game.lastSaveId++;
   }
 
   saveSerializedGame(serializedGame: SerializedGame): void {
     const text = JSON.stringify(serializedGame, null, 2);
     fs.writeFileSync(this._filename(serializedGame.id), text);
-    fs.writeFileSync(this._historyFilename(serializedGame.id, serializedGame.lastSaveId), text);
+    fs.writeFileSync(this._historyFilename(serializedGame.id, serializedGame.saveId), text);
   }
 
   getGame(game_id: GameId, cb: (err: Error | undefined, game?: SerializedGame) => void): void {

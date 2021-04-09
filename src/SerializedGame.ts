@@ -39,7 +39,7 @@ export interface SerializedGame {
     generation: number;
     id: GameId;
     initialDraftIteration: number;
-    lastSaveId: number;
+    saveId: number;
     milestones: Array<IMilestone>;
     monsInsuranceOwner: PlayerId | undefined;
     moonData: SerializedMoonData | undefined;
