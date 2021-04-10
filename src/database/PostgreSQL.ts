@@ -205,7 +205,8 @@ export class PostgreSQL implements IDatabase {
     );
 
     // This must occur after the save.
-    game.saveId++;
+    game.parentSaveId = game.saveId;
+    game.saveId++
   }
 
   deleteGameNbrSaves(game_id: GameId, rollbackCount: number): void {

@@ -33,6 +33,7 @@ export class Localfilesystem implements IDatabase {
     game.saveId++;
     console.log(`saving ${game.id} at position ${game.saveId}`);
     this.saveSerializedGame(game.serialize());
+    game.parentSaveId = game.saveId - 1;
   }
 
   saveSerializedGame(serializedGame: SerializedGame): void {

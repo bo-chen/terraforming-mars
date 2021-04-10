@@ -154,6 +154,7 @@ const DEFAULT_GAME_OPTIONS: GameOptions = {
 export class Game implements ISerializable<SerializedGame> {
   // Game-level data
   public saveId: number = 0;
+  public parentSaveId: number | undefined;
   private clonedGamedId: string | undefined;
   public seed: number;
   public spectatorId: SpectatorId | undefined;
@@ -414,7 +415,6 @@ export class Game implements ISerializable<SerializedGame> {
       generation: this.generation,
       id: this.id,
       initialDraftIteration: this.initialDraftIteration,
-      saveId: this.saveId,
       milestones: this.milestones,
       monsInsuranceOwner: this.monsInsuranceOwner,
       moonData: IMoonData.serialize(this.moonData),
@@ -423,6 +423,7 @@ export class Game implements ISerializable<SerializedGame> {
       phase: this.phase,
       players: this.players.map((p) => p.serialize()),
       researchedPlayers: Array.from(this.researchedPlayers),
+      saveId: this.saveId,
       seed: this.seed,
       someoneHasRemovedOtherPlayersPlants: this.someoneHasRemovedOtherPlayersPlants,
       spectatorId: this.spectatorId,
@@ -439,6 +440,9 @@ export class Game implements ISerializable<SerializedGame> {
     };
     if (this.aresData !== undefined) {
       result.aresData = this.aresData;
+    }
+    if (this.parentSaveId !== undefined) {
+      result.parentSaveId = this.parentSaveId;
     }
     if (this.clonedGamedId !== undefined) {
       result.clonedGamedId = this.clonedGamedId;
@@ -1602,6 +1606,7 @@ export class Game implements ISerializable<SerializedGame> {
     });
 
     game.saveId = d.saveId;
+    game.parentSaveId = d.parentSaveId;
     game.clonedGamedId = d.clonedGamedId;
     game.gameAge = d.gameAge;
     game.gameLog = d.gameLog;

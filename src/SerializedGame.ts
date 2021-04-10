@@ -44,6 +44,7 @@ export interface SerializedGame {
     monsInsuranceOwner: PlayerId | undefined;
     moonData: SerializedMoonData | undefined;
     oxygenLevel: number;
+    parentSaveId?: number;
     passedPlayers: Array<PlayerId>;
     phase: Phase;
     players: Array<SerializedPlayer>;

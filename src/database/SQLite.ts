@@ -164,6 +164,7 @@ export class SQLite implements IDatabase {
     );
 
     // This must occur after the save.
+    game.parentSaveId = game.saveId;
     game.saveId++;
   }
 
