@@ -113,9 +113,9 @@ export class GameLoader implements IGameLoader {
 
   public rollbackGameOnce(originalGame: Game, cb: LoadCallback): void {
     try {
-      Database.getInstance().restoreGame(originalGame.id, originalGame.saveId - 1, (err, game) => {
+      Database.getInstance().restoreGame(originalGame.id, originalGame.parentSaveId!, (err, game) => {
         if (game !== undefined) {
-          Database.getInstance().deleteGameNbrSaves(originalGame.id, 1);
+          Database.getInstance().deleteGameNbrSaves(originalGame.id, originalGame.saveId, 1);
           this.add(game);
           game.undoCount++;
           cb(game);

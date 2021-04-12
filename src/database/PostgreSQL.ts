@@ -209,12 +209,33 @@ export class PostgreSQL implements IDatabase {
     game.saveId++
   }
 
-  deleteGameNbrSaves(game_id: GameId, rollbackCount: number): void {
+  deleteGameNbrSaves(game_id: GameId, fromSaveId : number, rollbackCount: number): void {
     if (rollbackCount > 0) {
-      this.client.query('DELETE FROM games WHERE ctid IN (SELECT ctid FROM games WHERE game_id = $1 ORDER BY save_id DESC LIMIT $2)', [game_id, rollbackCount], (err) => {
+      this.client.query('SELECT game game FROM games WHERE game_id = ? AND save_id = ?', [game_id, fromSaveId], (err, res) => {
         if (err) {
-          return console.warn(err.message);
+          console.error('PostgreSQL:saveGame', err);
+          return;
         }
+        if (res.rows.length === 0) {
+          console.error('PostgreSQL:deleteGameNbrSaves', `Game ${game_id} not found`);
+          return;
+        }
+        const json = JSON.parse(res.rows[0].game)
+        const parent = json.parentSaveId ?? null;
+        if (parent === null) 
+        {
+          return console.warn(`Game ${game_id} could not be rolled back behind the root save ${fromSaveId}`);
+        }
+        this.client.query('DELETE FROM games WHERE rowid IN (SELECT rowid FROM games WHERE game_id = ? ORDER BY save_id DESC LIMIT ?)', [game_id, fromSaveId], (err) => {
+          if (err) {
+            console.error('PostgreSQL:saveGame', err);
+            return;
+          }
+          // TODO Set current save pointer here.
+          if (rollbackCount > 1) {
+            this.deleteGameNbrSaves(game_id, parent as number, rollbackCount - 1);
+          }
+        })
       });
     }
   }

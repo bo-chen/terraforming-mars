@@ -168,12 +168,27 @@ export class SQLite implements IDatabase {
     game.saveId++;
   }
 
-  deleteGameNbrSaves(game_id: GameId, rollbackCount: number): void {
+  deleteGameNbrSaves(game_id: GameId, fromSaveId : number, rollbackCount: number): void {
     if (rollbackCount > 0) {
-      this.db.run('DELETE FROM games WHERE rowid IN (SELECT rowid FROM games WHERE game_id = ? ORDER BY save_id DESC LIMIT ?)', [game_id, rollbackCount], function(err: Error | null) {
+      this.db.get('SELECT game game FROM games WHERE game_id = ? AND save_id = ?', [game_id, fromSaveId], (err: Error | null, row: { game: any; }) => {
         if (err) {
           return console.warn(err.message);
         }
+        const json = JSON.parse(row.game);
+        const parent = json.parentSaveId ?? null;
+        if (parent === null) 
+        {
+          return console.warn(`Game ${game_id} could not be rolled back behind the root save ${fromSaveId}`);
+        }
+        this.db.run('DELETE FROM games WHERE rowid IN (SELECT rowid FROM games WHERE game_id = ? ORDER BY save_id DESC LIMIT ?)', [game_id, fromSaveId], (err: Error | null) => {
+          if (err) {
+            return console.warn(err.message);
+          }
+          // TODO Set current save pointer here.
+          if (rollbackCount > 1) {
+            this.deleteGameNbrSaves(game_id, parent as number, rollbackCount - 1);
+          }
+        })
       });
     }
   }

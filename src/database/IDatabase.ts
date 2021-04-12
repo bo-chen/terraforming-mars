@@ -111,9 +111,9 @@ export interface IDatabase {
     /**
      * Deletes the last `rollbackCount` saves of the specified game.
      *
-     * Accessible by the administrative API to roll back a broken game.
+     * Accessible by the administrative API to roll back a broken game a current 'fromSaveId'
      */
-    deleteGameNbrSaves(game_id: GameId, rollbackCount: number): void;
+    deleteGameNbrSaves(game_id: GameId, fromSaveId : number, rollbackCount: number): void;
 
     /**
      * A maintenance task on a single game to close it out upon its completion.

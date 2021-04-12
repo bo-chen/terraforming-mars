@@ -118,7 +118,7 @@ export class Localfilesystem implements IDatabase {
     throw new Error('Undo not yet implemented');
   }
 
-  deleteGameNbrSaves(_game_id: GameId, _rollbackCount: number): void {
+  deleteGameNbrSaves(_game_id: GameId, _fromSaveId : number, _rollbackCount: number): void {
     throw new Error('Rollback not yet implemented');
   }
 }
