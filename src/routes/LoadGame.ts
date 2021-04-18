@@ -33,10 +33,9 @@ export class LoadGame extends Handler {
           if (rollbackCount > 0) {
             Database.getInstance().deleteGameNbrSaves(game_id, game.parentSaveId!, rollbackCount);
             GameLoader.getInstance().getByGameId(game_id, true, (restoredGame) => {
-              ctx.route.writeJson(res, Server.getGameModel(restoredGame!))
+              ctx.route.writeJson(res, Server.getGameModel(restoredGame!));
             });
-          }
-          else {
+          } else {
             ctx.route.writeJson(res, Server.getGameModel(game));
           }
         });

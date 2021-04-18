@@ -39,16 +39,16 @@ export interface SerializedGame {
     generation: number;
     id: GameId;
     initialDraftIteration: number;
-    saveId: number;
     milestones: Array<IMilestone>;
     monsInsuranceOwner: PlayerId | undefined;
     moonData: SerializedMoonData | undefined;
     oxygenLevel: number;
-    parentSaveId?: number;
+    parentSaveId?: string;
     passedPlayers: Array<PlayerId>;
     phase: Phase;
     players: Array<SerializedPlayer>;
     researchedPlayers: Array<PlayerId>;
+    saveId?: string;
     seed: number;
     someoneHasRemovedOtherPlayersPlants: boolean;
     spectatorId: SpectatorId | undefined;

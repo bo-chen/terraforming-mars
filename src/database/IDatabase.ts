@@ -52,7 +52,7 @@ export interface IDatabase {
     /**
      * Load a game at a specific save point.
      */
-    getGameVersion(game_id: GameId, save_id: number, cb: DbLoadCallback<SerializedGame>): void;
+    getGameVersion(game_id: GameId, save_id: string, cb: DbLoadCallback<SerializedGame>): void;
 
     /**
      * Return a list of all `game_id`s.
@@ -99,9 +99,7 @@ export interface IDatabase {
      * The meat behind player undo. Loads the game at the given save point,
      * and provides it in the callback.
      */
-    // TODO(kberg): it's not clear to me how this save_id is known to
-    // be the absolute prior game id, so that could use some clarification.
-    restoreGame(game_id: GameId, save_id: number, cb: DbLoadCallback<Game>): void;
+    restoreGame(game_id: GameId, save_id: string, cb: DbLoadCallback<Game>): void;
 
     /**
      * Load a game at save point 0, and provide it in the callback.
@@ -111,9 +109,9 @@ export interface IDatabase {
     /**
      * Deletes the last `rollbackCount` saves of the specified game.
      *
-     * Accessible by the administrative API to roll back a broken game a current 'fromSaveId'
+     * Accessible by the administrative API to roll back a broken game.
      */
-    deleteGameNbrSaves(game_id: GameId, fromSaveId : number, rollbackCount: number): void;
+    deleteGameNbrSaves(game_id: GameId, fromSaveId : string, rollbackCount: number): void;
 
     /**
      * A maintenance task on a single game to close it out upon its completion.
@@ -128,7 +126,7 @@ export interface IDatabase {
     // TODO(kberg): rename to represent that it's closing out
     // this game. Also consider not needing the save_id, and
     // also to make the maintenance behavior a first-class method.
-    cleanSaves(game_id: GameId, save_id: number): void;
+    cleanSaves(game_id: GameId, save_id: string): void;
 
     /**
      * A maintenance task that purges abandoned solo games older

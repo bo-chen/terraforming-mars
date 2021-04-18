@@ -115,7 +115,7 @@ export class GameLoader implements IGameLoader {
     try {
       Database.getInstance().restoreGame(originalGame.id, originalGame.parentSaveId!, (err, game) => {
         if (game !== undefined) {
-          Database.getInstance().deleteGameNbrSaves(originalGame.id, originalGame.saveId, 1);
+          Database.getInstance().deleteGameNbrSaves(originalGame.id, originalGame.saveId!, 1);
           this.add(game);
           game.undoCount++;
           cb(game);

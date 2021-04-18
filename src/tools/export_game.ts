@@ -14,6 +14,24 @@ if (process.env.LOCAL_FS_DB !== undefined) {
 const db = Database.getInstance();
 const localDb = new Localfilesystem();
 
+// Recursively copy all versions from saveId to root
+function copySaveId(gameId : string, saveId : string) {
+  db.getGameVersion(gameId, saveId, (err, serialized) => {
+    if (err) {
+      console.error(err);
+      return;
+    }
+    console.log(`Storing version ${saveId}`);
+    if (serialized!.parentSaveId === undefined) {
+      // At root
+      localDb.saveSerializedGame(serialized!, true);
+    } else {
+      localDb.saveSerializedGame(serialized!, false);
+      copySaveId(gameId, serialized!.parentSaveId);
+    }
+  });
+}
+
 console.log(`Loading game ${gameId}`);
 db.getGame(gameId, (err: Error | undefined, game?: SerializedGame) => {
   if (err) {
@@ -26,11 +44,9 @@ db.getGame(gameId, (err: Error | undefined, game?: SerializedGame) => {
   }
 
   console.log(`Last version is ${game.saveId}`);
-  for (let version = 0; version <= game.saveId; version++) {
-    db.getGameVersion(gameId, version, (_err, serialized) => {
-      console.log(`Storing version ${version}`);
-      localDb.saveSerializedGame(serialized!);
-    });
-  }
+  // recurse and save all versions
+  copySaveId(gameId, game.saveId!);
+  // save current version again so it is saved as the "current" game
+  localDb.saveSerializedGame(game!, false);
 });
 

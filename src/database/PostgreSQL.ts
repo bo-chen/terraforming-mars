@@ -20,23 +20,34 @@ export class PostgreSQL implements IDatabase {
     }
     this.client = new Client(config);
     this.client.connect();
-    this.client.query('CREATE TABLE IF NOT EXISTS games(game_id varchar, players integer, save_id integer, game text, status text default \'running\', created_time timestamp default now(), PRIMARY KEY (game_id, save_id))', (err) => {
-      if (err) {
-        throw err;
-      }
-    });
-    this.client.query('CREATE TABLE IF NOT EXISTS game_results(game_id varchar not null, seed_game_id varchar, players integer, generations integer, game_options text, scores text, PRIMARY KEY (game_id))', (err) => {
-      if (err) {
-        throw err;
-      }
-    });
-
-    this.client.query('CREATE INDEX IF NOT EXISTS games_i1 on games(save_id)', (err) => {
-      if (err) {
-        throw err;
-      }
-    });
-    this.client.query('CREATE INDEX IF NOT EXISTS games_i2 on games(created_time )', (err) => {
+    // Don't set foreign key for current_save_id and first_save_id so it's easier to delete
+    this.client.query(
+      `CREATE TABLE IF NOT EXISTS games(
+        game_id VARCHAR PRIMARY KEY, 
+        players INTEGER, 
+        first_save_id VARCHAR,
+        current_save_id VARCHAR,
+        status TEXT DEFAULT 'running', 
+        created_time TIMESTAMP NOT NULL DEFAULT now(),
+      )`);
+    this.client.query(
+      `CREATE TABLE IF NOT EXISTS saves(
+        save_id VARCHAR PRIMARY KEY, 
+        game_id VARCHAR NOT NULL, 
+        game JSONB NOT NULL, 
+        created_time TIMESTAMP NOT NULL DEFAULT now(), 
+        FOREIGN KEY(game_id) REFERENCES games(game_id)
+      )`);
+    this.client.query(
+      `CREATE TABLE IF NOT EXISTS game_results(
+        game_id VARCHAR PRIMARY KEY, 
+        seed_game_id VARCHAR NOT NULL, 
+        players INTEGER NOT NULL, 
+        generations INTEGER NOT NULL, 
+        game_options JSONB NOT NULL, 
+        scores JSONB NOT NULL
+      )`);
+    this.client.query('CREATE INDEX IF NOT EXISTS games_created_time_index on games(created_time )', (err) => {
       if (err) {
         throw err;
       }
@@ -45,7 +56,7 @@ export class PostgreSQL implements IDatabase {
 
   getClonableGames(cb: (err: Error | undefined, allGames: Array<IGameData>) => void) {
     const allGames: Array<IGameData> = [];
-    const sql = 'SELECT distinct game_id game_id, players players FROM games WHERE save_id = 0 order by game_id asc';
+    const sql = 'SELECT game_id, players FROM games ORDER BY game_id ASC';
 
     this.client.query(sql, (err, res) => {
       if (err) {
@@ -68,7 +79,7 @@ export class PostgreSQL implements IDatabase {
 
   getGames(cb: (err: Error | undefined, allGames: Array<GameId>) => void) {
     const allGames: Array<GameId> = [];
-    const sql: string = 'SELECT games.game_id FROM games, (SELECT max(save_id) save_id, game_id FROM games WHERE status=\'running\' GROUP BY game_id) a WHERE games.game_id = a.game_id AND games.save_id = a.save_id ORDER BY created_time DESC';
+    const sql: string = `SELECT game_id FROM games WHERE status = 'running' ORDER BY created_time DESC`;
     this.client.query(sql, (err, res) => {
       if (err) {
         console.error('PostgreSQL:getGames', err);
@@ -84,7 +95,11 @@ export class PostgreSQL implements IDatabase {
 
   loadCloneableGame(game_id: GameId, cb: DbLoadCallback<SerializedGame>) {
     // Retrieve first save from database
-    this.client.query('SELECT game_id game_id, game game FROM games WHERE game_id = $1 AND save_id = 0', [game_id], (err: Error | undefined, res) => {
+    const sql = `SELECT s.game 
+      FROM games g
+      INNER JOIN saves s ON s.save_id = g.first_save_id
+      WHERE g.game_id = $1`;
+    this.client.query(sql, [game_id], (err: Error | undefined, res) => {
       if (err) {
         console.error('PostgreSQL:restoreReferenceGame', err);
         return cb(err, undefined);
@@ -103,9 +118,14 @@ export class PostgreSQL implements IDatabase {
     });
   }
 
+  // TODO(bo-chen) cb should have type DbLoadCallback<SerializedGame>?
   getGame(game_id: GameId, cb: (err: Error | undefined, game?: SerializedGame) => void): void {
     // Retrieve last save from database
-    this.client.query('SELECT game game FROM games WHERE game_id = $1 ORDER BY save_id DESC LIMIT 1', [game_id], (err, res) => {
+    const sql = `SELECT s.game 
+      FROM games g
+      INNER JOIN saves s ON s.save_id = g.current_save_id
+      WHERE g.game_id = $1`;
+    this.client.query(sql, [game_id], (err, res) => {
       if (err) {
         console.error('PostgreSQL:getGame', err);
         return cb(err);
@@ -117,8 +137,8 @@ export class PostgreSQL implements IDatabase {
     });
   }
 
-  getGameVersion(game_id: GameId, save_id: number, cb: DbLoadCallback<SerializedGame>): void {
-    this.client.query('SELECT game game FROM games WHERE game_id = $1 and save_id = $2', [game_id, save_id], (err: Error | null, res: QueryResult<any>) => {
+  getGameVersion(game_id: GameId, save_id: string, cb: DbLoadCallback<SerializedGame>): void {
+    this.client.query('SELECT game FROM saves WHERE game_id = $1 AND save_id = $2', [game_id, save_id], (err: Error | null, res: QueryResult<any>) => {
       if (err) {
         console.error('PostgreSQL:getGameVersion', err);
         return cb(err, undefined);
@@ -136,18 +156,28 @@ export class PostgreSQL implements IDatabase {
     });
   }
 
-  cleanSaves(game_id: GameId, save_id: number): void {
+  cleanSaves(game_id: GameId, _save_id: string): void {
     // DELETE all saves except initial and last one
-    this.client.query('DELETE FROM games WHERE game_id = $1 AND save_id < $2 AND save_id > 0', [game_id, save_id], (err) => {
+    this.client.query('SELECT first_save_id, current_save_id FROM games WHERE game_id = $1', [game_id], (err: Error | null, res: QueryResult<any>) => {
       if (err) {
         console.error('PostgreSQL:cleanSaves', err);
         throw err;
       }
-      // Flag game as finished
-      this.client.query('UPDATE games SET status = \'finished\' WHERE game_id = $1', [game_id], (err2) => {
+      if (res.rowCount === 0) {
+        return console.warn(`Couldn't find game ${game_id} to cleanSaves`);
+      }
+      const row = res.rows[0];
+      this.client.query('DELETE FROM saves WHERE game_id = $1 AND save_id != $2 AND save_id != $3', [game_id, row.current_save_id, row.first_save_id], (err2) => {
         if (err2) {
           console.error('PostgreSQL:cleanSaves2', err2);
           throw err2;
+        }
+      });
+      // Flag game as finished
+      this.client.query(`UPDATE games SET status = 'finished' WHERE game_id = $1`, [game_id], (err3) => {
+        if (err3) {
+          console.error('PostgreSQL:cleanSaves2', err3);
+          throw err3;
         }
       });
     });
@@ -158,19 +188,44 @@ export class PostgreSQL implements IDatabase {
   purgeUnfinishedGames(): void {
     const envDays = parseInt(process.env.MAX_GAME_DAYS || '');
     const days = Number.isInteger(envDays) ? envDays : 10;
-    this.client.query('DELETE FROM games WHERE created_time < now() - interval \'1 day\' * $1', [days], function(err?: Error, res?: QueryResult<any>) {
-      if (res) {
-        console.log(`Purged ${res.rowCount} rows`);
-      }
+    this.client.query(`SELECT game_id FROM games WHERE created_time < now() - interval '1 day' * $1 and status = 'running'`, [days], (err?: Error, res?: QueryResult<any>) => {
       if (err) {
-        return console.warn(err.message);
+        console.warn('PostgreSQL:purgeUnfinishedGames1', err.message);
+        return;
+      }
+      if (res === undefined) {
+        console.warn(`PostgreSQL:purgeUnfinishedGames2`);
+        return;
+      }
+
+      if (res.rowCount > 0) {
+        const placeholders : string = res.rows.map(() => '?').join(',');
+        const gameIds : Array<string> = res.rows.map((r) => r.game_id);
+        this.client.query(`DELETE FROM saves WHERE game_id IN (${placeholders})`, gameIds, (err?: Error, res?: QueryResult<any>) => {
+          if (err) {
+            console.warn('PostgreSQL:purgeUnfinishedGames3', err.message);
+            return;
+          }
+          if (res) {
+            console.log(`Purged ${res.rowCount} saves`);
+          }
+        });
+        this.client.query(`DELETE FROM games WHERE game_id IN (${placeholders})`, gameIds, (err?: Error, res?: QueryResult<any>) => {
+          if (err) {
+            console.warn('PostgreSQL:purgeUnfinishedGames4', err.message);
+            return;
+          }
+          if (res) {
+            console.log(`Purged ${res.rowCount} games`);
+          }
+        });
       }
     });
   }
 
-  restoreGame(game_id: GameId, save_id: number, cb: DbLoadCallback<Game>): void {
+  restoreGame(game_id: GameId, save_id: string, cb: DbLoadCallback<Game>): void {
     // Retrieve last save from database
-    this.client.query('SELECT game game FROM games WHERE game_id = $1 AND save_id = $2 ORDER BY save_id DESC LIMIT 1', [game_id, save_id], (err, res) => {
+    this.client.query('SELECT game FROM saves WHERE game_id = $1 AND save_id = $2', [game_id, save_id], (err, res) => {
       if (err) {
         console.error('PostgreSQL:restoreGame', err);
         cb(err, undefined);
@@ -193,50 +248,69 @@ export class PostgreSQL implements IDatabase {
   }
 
   saveGame(game: Game): void {
+    // Set new save_id before saving to db
+    game.parentSaveId = game.saveId;
+    game.saveId = this.generateRandomId('v');
+    const save_id = game.saveId;
+
     const gameJSON = game.toJSON();
-    this.client.query(
-      'INSERT INTO games (game_id, save_id, game, players) VALUES ($1, $2, $3, $4) ON CONFLICT (game_id, save_id) DO UPDATE SET game = $3',
-      [game.id, game.saveId + 1, gameJSON, game.getPlayers().length], (err) => {
+
+    // Upsert game before inserting save
+    const sql = 'INSERT INTO games (game_id, current_save_id, first_save_id, players) VALUES ($1, $2, $2, $3) ON CONFLICT (game_id) DO UPDATE SET current_game_id = $2';
+    this.client.query(sql, [game.id, save_id, game.getPlayers().length], (err) => {
+      if (err) {
+        console.error('PostgreSQL:saveGame', err);
+        return;
+      }
+      this.client.query('INSERT INTO saves (game_id, save_id, game) VALUES ($1, $2, $3)', [game.id, save_id, gameJSON], (err) => {
         if (err) {
           console.error('PostgreSQL:saveGame', err);
           return;
         }
-      },
-    );
-
-    // This must occur after the save.
-    game.parentSaveId = game.saveId;
-    game.saveId++
+      });
+    });
   }
 
-  deleteGameNbrSaves(game_id: GameId, fromSaveId : number, rollbackCount: number): void {
-    if (rollbackCount > 0) {
-      this.client.query('SELECT game game FROM games WHERE game_id = ? AND save_id = ?', [game_id, fromSaveId], (err, res) => {
-        if (err) {
-          console.error('PostgreSQL:saveGame', err);
-          return;
-        }
-        if (res.rows.length === 0) {
-          console.error('PostgreSQL:deleteGameNbrSaves', `Game ${game_id} not found`);
-          return;
-        }
-        const json = JSON.parse(res.rows[0].game)
-        const parent = json.parentSaveId ?? null;
-        if (parent === null) 
-        {
-          return console.warn(`Game ${game_id} could not be rolled back behind the root save ${fromSaveId}`);
-        }
-        this.client.query('DELETE FROM games WHERE rowid IN (SELECT rowid FROM games WHERE game_id = ? ORDER BY save_id DESC LIMIT ?)', [game_id, fromSaveId], (err) => {
-          if (err) {
-            console.error('PostgreSQL:saveGame', err);
-            return;
-          }
-          // TODO Set current save pointer here.
-          if (rollbackCount > 1) {
-            this.deleteGameNbrSaves(game_id, parent as number, rollbackCount - 1);
-          }
-        })
-      });
+  deleteGameNbrSaves(game_id: GameId, fromSaveId : string, rollbackCount: number): void {
+    if (rollbackCount <= 0) {
+      return;
     }
+    this.client.query('SELECT game FROM games WHERE game_id = ? AND save_id = ?', [game_id, fromSaveId], (err, res) => {
+      if (err) {
+        console.error('PostgreSQL:saveGame', err);
+        return;
+      }
+      if (res.rows.length === 0) {
+        console.error('PostgreSQL:deleteGameNbrSaves', `Game ${game_id} not found`);
+        return;
+      }
+      const json = JSON.parse(res.rows[0].game);
+      const parent = json.parentSaveId ?? null;
+      if (parent === null) {
+        return console.warn(`Game ${game_id} could not be rolled back behind the root save ${fromSaveId}`);
+      }
+      this.client.query('DELETE FROM saves WHERE game_id = $1 AND save_id = $2', [game_id, fromSaveId], (err) => {
+        if (err) {
+          console.error('PostgreSQL:saveGame2', err);
+          return;
+        }
+        if (rollbackCount > 1 && parent !== null) {
+          this.deleteGameNbrSaves(game_id, parent as string, rollbackCount - 1);
+        } else {
+          this.client.query('UPDATE games SET current_save_id = $1 WHERE game_id = $2', [parent, game_id], (err) => {
+            if (err) {
+              console.error('PostgreSQL:saveGame3', err);
+              return;
+            }
+          });
+        }
+      });
+    });
+  }
+
+  // TODO(Bo) Both this and the copy in GameHandler should probably be moved to Game.ts
+  public generateRandomId(prefix: string): string {
+    // 281474976710656 possible values.
+    return prefix + Math.floor(Math.random() * Math.pow(16, 12)).toString(16);
   }
 }

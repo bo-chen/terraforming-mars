@@ -153,8 +153,8 @@ const DEFAULT_GAME_OPTIONS: GameOptions = {
 
 export class Game implements ISerializable<SerializedGame> {
   // Game-level data
-  public saveId: number = 0;
-  public parentSaveId: number | undefined;
+  public saveId: string | undefined;
+  public parentSaveId: string | undefined;
   private clonedGamedId: string | undefined;
   public seed: number;
   public spectatorId: SpectatorId | undefined;
@@ -423,7 +423,6 @@ export class Game implements ISerializable<SerializedGame> {
       phase: this.phase,
       players: this.players.map((p) => p.serialize()),
       researchedPlayers: Array.from(this.researchedPlayers),
-      saveId: this.saveId,
       seed: this.seed,
       someoneHasRemovedOtherPlayersPlants: this.someoneHasRemovedOtherPlayersPlants,
       spectatorId: this.spectatorId,
@@ -440,6 +439,9 @@ export class Game implements ISerializable<SerializedGame> {
     };
     if (this.aresData !== undefined) {
       result.aresData = this.aresData;
+    }
+    if (this.saveId !== undefined) {
+      result.saveId = this.saveId;
     }
     if (this.parentSaveId !== undefined) {
       result.parentSaveId = this.parentSaveId;
@@ -1034,7 +1036,7 @@ export class Game implements ISerializable<SerializedGame> {
     }
 
     if (this.gameOptions.cleanSavesOnEnd) {
-      Database.getInstance().cleanSaves(this.id, this.saveId);
+      Database.getInstance().cleanSaves(this.id, this.saveId!);
     }
     const scores: Array<Score> = [];
     this.players.forEach((player) => {

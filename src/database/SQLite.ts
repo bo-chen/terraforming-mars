@@ -18,13 +18,38 @@ export class SQLite implements IDatabase {
       fs.mkdirSync(dbFolder);
     }
     this.db = new sqlite3.Database(dbPath);
-    this.db.run('CREATE TABLE IF NOT EXISTS games(game_id varchar, players integer, save_id integer, game text, status text default \'running\', created_time timestamp default (strftime(\'%s\', \'now\')), PRIMARY KEY (game_id, save_id))');
-    this.db.run('CREATE TABLE IF NOT EXISTS game_results(game_id varchar not null, seed_game_id varchar, players integer, generations integer, game_options text, scores text, PRIMARY KEY (game_id))');
+    // Don't set foreign key for current_save_id and first_save_id so it's easier to delete
+    this.db.run(
+      `CREATE TABLE IF NOT EXISTS games(
+        game_id VARCHAR PRIMARY KEY, 
+        players INTEGER, 
+        first_save_id VARCHAR,
+        current_save_id VARCHAR,
+        status text DEFAULT 'running', 
+        created_time TIMESTAMP DEFAULT (strftime('%s', 'now')),
+      )`);
+    this.db.run(
+      `CREATE TABLE IF NOT EXISTS saves(
+        save_id VARCHAR PRIMARY KEY, 
+        game_id VARCHAR NOT NULL, 
+        game TEXT NOT NULL, 
+        created_time TIMESTAMP NOT NULL DEFAULT (strftime('%s', 'now'), 
+        FOREIGN KEY(game_id) REFERENCES games(game_id)
+      )`);
+    this.db.run(
+      `CREATE TABLE IF NOT EXISTS game_results(
+        game_id VARCHAR PRIMARY KEY, 
+        seed_game_id VARCHAR NOT NULL, 
+        players INTEGER NOT NULL, 
+        generations INTEGER NOT NULL, 
+        game_options TEXT NOT NULL, 
+        scores TEXT NOT NULL
+      )`);
   }
 
   getClonableGames(cb: (err: Error | undefined, allGames: Array<IGameData>) => void) {
     const allGames: Array<IGameData> = [];
-    const sql = 'SELECT distinct game_id game_id, players players FROM games WHERE save_id = 0 order by game_id asc';
+    const sql = `SELECT game_id, players FROM games ORDER BY game_id ASC`;
 
     this.db.all(sql, [], (err, rows) => {
       if (rows) {
@@ -44,7 +69,7 @@ export class SQLite implements IDatabase {
 
   getGames(cb: (err: Error | undefined, allGames: Array<GameId>) => void) {
     const allGames: Array<GameId> = [];
-    const sql: string = 'SELECT distinct game_id game_id FROM games WHERE status = \'running\'';
+    const sql: string = `SELECT game_id FROM games WHERE status = 'running' ORDER BY created_at DESC`;
     this.db.all(sql, [], (err, rows) => {
       if (rows) {
         rows.forEach((row) => {
@@ -57,8 +82,12 @@ export class SQLite implements IDatabase {
 
   loadCloneableGame(game_id: GameId, cb: DbLoadCallback<SerializedGame>) {
     // Retrieve first save from database
-    this.db.get('SELECT game_id game_id, game game FROM games WHERE game_id = ? AND save_id = 0', [game_id], (err: Error | null, row: { game_id: GameId, game: any; }) => {
-      if (row.game_id === undefined) {
+    const sql = `SELECT s.game 
+      FROM games g
+      INNER JOIN saves s ON s.save_id = g.first_save_id
+      WHERE g.game_id = ?`;
+    this.db.get(sql, [game_id], (err: Error | null, row: { game_id: GameId, game: any; }) => {
+      if (row === undefined) {
         return cb(new Error('Game not found'), undefined);
       }
 
@@ -66,7 +95,7 @@ export class SQLite implements IDatabase {
         const json = JSON.parse(row.game);
         return cb(err ?? undefined, json);
       } catch (exception) {
-        console.error(`unable to load game ${game_id} at save point 0`, exception);
+        console.error(`unable to load game ${game_id} at first save point`, exception);
         cb(exception, undefined);
         return;
       }
@@ -87,7 +116,11 @@ export class SQLite implements IDatabase {
 
   getGame(game_id: GameId, cb: (err: Error | undefined, game?: SerializedGame) => void): void {
     // Retrieve last save from database
-    this.db.get('SELECT game game FROM games WHERE game_id = ? ORDER BY save_id DESC LIMIT 1', [game_id], (err: Error | null, row: { game: any; }) => {
+    const sql = `SELECT s.game 
+      FROM games g
+      INNER JOIN saves s ON s.save_id = g.current_save_id
+      WHERE g.game_id = ?`;
+    this.db.get(sql, [game_id], (err: Error | null, row: { game_id: GameId, game: any; }) => {
       if (err) {
         return cb(err ?? undefined);
       }
@@ -95,8 +128,8 @@ export class SQLite implements IDatabase {
     });
   }
 
-  getGameVersion(game_id: GameId, save_id: number, cb: DbLoadCallback<SerializedGame>): void {
-    this.db.get('SELECT game game FROM games WHERE game_id = ? and save_id = ?', [game_id, save_id], (err: Error | null, row: { game: any; }) => {
+  getGameVersion(game_id: GameId, save_id: string, cb: DbLoadCallback<SerializedGame>): void {
+    this.db.get('SELECT game FROM saves WHERE game_id = ? AND save_id = ?', [game_id, save_id], (err: Error | null, row: { game: any; }) => {
       if (err) {
         return cb(err ?? undefined, undefined);
       }
@@ -104,36 +137,58 @@ export class SQLite implements IDatabase {
     });
   }
 
-  cleanSaves(game_id: GameId, save_id: number): void {
+  cleanSaves(game_id: GameId, _save_id: string): void {
     // DELETE all saves except initial and last one
-    this.db.run('DELETE FROM games WHERE game_id = ? AND save_id != ? AND save_id != 0', [game_id, save_id], function(err: Error | null) {
+    this.db.get('SELECT first_save_id, current_save_id FROM games WHERE game_id = ?', [game_id], (err: Error | null, row: { first_save_id: any, current_save_id: any }) => {
       if (err) {
         return console.warn(err.message);
       }
-    });
-    // Flag game as finished
-    this.db.run('UPDATE games SET status = \'finished\' WHERE game_id = ?', [game_id], function(err: Error | null) {
-      if (err) {
-        return console.warn(err.message);
+      if (row === undefined) {
+        return console.warn(`Couldn't find game ${game_id} to cleanSaves`);
       }
+      this.db.run(`DELETE FROM saves WHERE game_id = ? AND save_id != ? AND save_id != ?`, [game_id, row.current_save_id, row.first_save_id], function(err: Error | null) {
+        if (err) {
+          return console.warn(err.message);
+        }
+      });
+      // Flag game as finished
+      this.db.run(`UPDATE games SET status = 'finished' WHERE game_id = ?`, [game_id], function(err: Error | null) {
+        if (err) {
+          return console.warn(err.message);
+        }
+      });
     });
+
     this.purgeUnfinishedGames();
   }
 
   purgeUnfinishedGames(): void {
     // Purge unfinished games older than MAX_GAME_DAYS days. If this .env variable is not present, unfinished games will not be purged.
     if (process.env.MAX_GAME_DAYS) {
-      this.db.run('DELETE FROM games WHERE created_time < strftime(\'%s\',date(\'now\', \'-? day\')) and status = \'running\'', [process.env.MAX_GAME_DAYS], function(err: Error | null) {
+      this.db.all(`SELECT game_id FROM games WHERE created_time < strftime('%s',date('now', '-? day')) and status = 'running'`, [process.env.MAX_GAME_DAYS], (err: Error | null, rows: Array<{ game_id : string }>) => {
         if (err) {
-          return console.warn(err.message);
+          return console.warn(err?.message);
+        }
+        if (rows.length > 0) {
+          const placeholders : string = rows.map(() => '?').join(',');
+          const gameIds : Array<string> = rows.map((r) => r.game_id);
+          this.db.run(`DELETE FROM saves WHERE game_id IN (${placeholders})`, gameIds, (err: Error | null) => {
+            if (err) {
+              return console.warn(err?.message);
+            }
+            this.db.run(`DELETE FROM games WHERE game_id IN (${placeholders}) `, gameIds, function(err: Error | null) {
+              if (err) {
+                return console.warn(err.message);
+              }
+            });
+          });
         }
       });
     }
   }
 
-  restoreGame(game_id: GameId, save_id: number, cb: DbLoadCallback<Game>): void {
-    // Retrieve last save from database
-    this.db.get('SELECT game game FROM games WHERE game_id = ? AND save_id = ? ORDER BY save_id DESC LIMIT 1', [game_id, save_id], (err: Error | null, row: { game: any; }) => {
+  restoreGame(game_id: GameId, save_id: string, cb: DbLoadCallback<Game>): void {
+    this.db.get('SELECT game FROM saves WHERE game_id = ? AND save_id = ?', [game_id, save_id], (err: Error | null, row: { game: any; }) => {
       if (err) {
         console.error(err.message);
         cb(err, undefined);
@@ -150,46 +205,63 @@ export class SQLite implements IDatabase {
   }
 
   saveGame(game: Game): void {
+    // Set new save_id before saving to db
+    game.parentSaveId = game.saveId;
+    game.saveId = this.generateRandomId('v');
+    const save_id = game.saveId;
+
     const gameJSON = game.toJSON();
-    // Insert
-    this.db.run(
-      'INSERT INTO games (game_id, save_id, game, players) VALUES (?, ?, ?, ?) ON CONFLICT (game_id, save_id) DO UPDATE SET game = ?',
-      [game.id, game.saveId + 1, gameJSON, game.getPlayers().length, gameJSON],
-      (err: Error | null) => {
+
+    // Upsert game before inserting save
+    const sql = 'INSERT INTO games (game_id, current_save_id, first_save_id, players) VALUES (?, ?, ?, ?) ON CONFLICT (game_id) DO UPDATE SET current_game_id = ?';
+    this.db.run(sql, [game.id, save_id, save_id, game.getPlayers().length, save_id], (err: Error | null) => {
+      if (err) {
+        console.error(err.message);
+        return;
+      }
+
+      this.db.run('INSERT INTO saves (game_id, save_id, game) VALUES ($1, $2, $3)', [game.id, save_id, gameJSON], function(err: Error | null) {
         if (err) {
           console.error(err.message);
           return;
         }
-      },
-    );
-
-    // This must occur after the save.
-    game.parentSaveId = game.saveId;
-    game.saveId++;
+      });
+    });
   }
 
-  deleteGameNbrSaves(game_id: GameId, fromSaveId : number, rollbackCount: number): void {
-    if (rollbackCount > 0) {
-      this.db.get('SELECT game game FROM games WHERE game_id = ? AND save_id = ?', [game_id, fromSaveId], (err: Error | null, row: { game: any; }) => {
+  deleteGameNbrSaves(game_id: GameId, fromSaveId : string, rollbackCount: number): void {
+    if (rollbackCount <= 0) {
+      return;
+    }
+    this.db.get('SELECT game FROM saves WHERE game_id = ? AND save_id = ?', [game_id, fromSaveId], (err: Error | null, row: { game: any; }) => {
+      if (err) {
+        return console.warn(err.message);
+      }
+      const json = JSON.parse(row.game);
+      const parent = json.parentSaveId ?? null;
+      if (parent === null) {
+        return console.warn(`Game ${game_id} could not be rolled back behind the root save ${fromSaveId}`);
+      }
+      this.db.run('DELETE FROM saves WHERE game_id = ? AND save_id = ?', [game_id, fromSaveId], (err: Error | null) => {
         if (err) {
           return console.warn(err.message);
         }
-        const json = JSON.parse(row.game);
-        const parent = json.parentSaveId ?? null;
-        if (parent === null) 
-        {
-          return console.warn(`Game ${game_id} could not be rolled back behind the root save ${fromSaveId}`);
+        if (rollbackCount > 1 && parent !== null) {
+          this.deleteGameNbrSaves(game_id, parent as string, rollbackCount - 1);
+        } else {
+          this.db.run('UPDATE games SET current_save_id = ? WHERE game_id = ?', [parent, game_id], function(err: Error | null) {
+            if (err) {
+              return console.warn(err.message);
+            }
+          });
         }
-        this.db.run('DELETE FROM games WHERE rowid IN (SELECT rowid FROM games WHERE game_id = ? ORDER BY save_id DESC LIMIT ?)', [game_id, fromSaveId], (err: Error | null) => {
-          if (err) {
-            return console.warn(err.message);
-          }
-          // TODO Set current save pointer here.
-          if (rollbackCount > 1) {
-            this.deleteGameNbrSaves(game_id, parent as number, rollbackCount - 1);
-          }
-        })
       });
-    }
+    });
+  }
+
+  // TODO(Bo) Both this and the copy in GameHandler should probably be moved to Game.ts
+  public generateRandomId(prefix: string): string {
+    // 281474976710656 possible values.
+    return prefix + Math.floor(Math.random() * Math.pow(16, 12)).toString(16);
   }
 }

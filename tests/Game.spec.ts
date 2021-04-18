@@ -517,8 +517,8 @@ describe('Game', function() {
     const player = TestPlayers.BLUE.newPlayer();
     const game = Game.newInstance('foobar', [player], player);
     const serialized = game.serialize();
-    const serializedKeys = Object.keys(serialized);
-    const gameKeys = Object.keys(game);
+    const serializedKeys = Object.keys(serialized).sort();
+    const gameKeys = Object.keys(game).sort();
     expect(gameKeys).not.include('moonData');
     expect(serializedKeys).to.have.members(gameKeys.concat('moonData'));
   });
@@ -527,8 +527,8 @@ describe('Game', function() {
     const player = TestPlayers.BLUE.newPlayer();
     const game = Game.newInstance('foobar', [player], player, TestingUtils.setCustomGameOptions({moonExpansion: true}));
     const serialized = game.serialize();
-    const serializedKeys = Object.keys(serialized);
-    const gameKeys = Object.keys(game);
+    const serializedKeys = Object.keys(serialized).sort();
+    const gameKeys = Object.keys(game).sort();
     expect(serializedKeys).to.have.members(gameKeys);
   });
 
