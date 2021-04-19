@@ -26,16 +26,24 @@ export class SQLite implements IDatabase {
         first_save_id VARCHAR,
         current_save_id VARCHAR,
         status text DEFAULT 'running', 
-        created_time TIMESTAMP DEFAULT (strftime('%s', 'now')),
-      )`);
+        created_time TIMESTAMP DEFAULT (strftime('%s', 'now')))`, [], (err) => {
+        if (err) {
+          console.error('SQLite:constructor', err);
+          throw err;
+        }
+      });
     this.db.run(
       `CREATE TABLE IF NOT EXISTS saves(
         save_id VARCHAR PRIMARY KEY, 
         game_id VARCHAR NOT NULL, 
         game TEXT NOT NULL, 
-        created_time TIMESTAMP NOT NULL DEFAULT (strftime('%s', 'now'), 
-        FOREIGN KEY(game_id) REFERENCES games(game_id)
-      )`);
+        created_time TIMESTAMP NOT NULL DEFAULT (strftime('%s', 'now')), 
+        FOREIGN KEY(game_id) REFERENCES games(game_id))`, [], (err) => {
+        if (err) {
+          console.error('SQLite:constructor', err);
+          throw err;
+        }
+      });
     this.db.run(
       `CREATE TABLE IF NOT EXISTS game_results(
         game_id VARCHAR PRIMARY KEY, 
@@ -43,8 +51,12 @@ export class SQLite implements IDatabase {
         players INTEGER NOT NULL, 
         generations INTEGER NOT NULL, 
         game_options TEXT NOT NULL, 
-        scores TEXT NOT NULL
-      )`);
+        scores TEXT NOT NULL)`, [], (err) => {
+        if (err) {
+          console.error('SQLite:constructor', err);
+          throw err;
+        }
+      });
   }
 
   getClonableGames(cb: (err: Error | undefined, allGames: Array<IGameData>) => void) {
@@ -52,6 +64,11 @@ export class SQLite implements IDatabase {
     const sql = `SELECT game_id, players FROM games ORDER BY game_id ASC`;
 
     this.db.all(sql, [], (err, rows) => {
+      if (err) {
+        console.error('SQLite:getClonableGames', err);
+        throw err;
+      }
+
       if (rows) {
         rows.forEach((row) => {
           const gameId: GameId = row.game_id;
@@ -69,8 +86,12 @@ export class SQLite implements IDatabase {
 
   getGames(cb: (err: Error | undefined, allGames: Array<GameId>) => void) {
     const allGames: Array<GameId> = [];
-    const sql: string = `SELECT game_id FROM games WHERE status = 'running' ORDER BY created_at DESC`;
+    const sql: string = `SELECT game_id FROM games WHERE status = 'running' ORDER BY created_time DESC`;
     this.db.all(sql, [], (err, rows) => {
+      if (err) {
+        console.error('SQLite:getGames', err);
+        throw err;
+      }
       if (rows) {
         rows.forEach((row) => {
           allGames.push(row.game_id);
@@ -87,6 +108,11 @@ export class SQLite implements IDatabase {
       INNER JOIN saves s ON s.save_id = g.first_save_id
       WHERE g.game_id = ?`;
     this.db.get(sql, [game_id], (err: Error | null, row: { game_id: GameId, game: any; }) => {
+      if (err) {
+        console.error('SQLite:loadCloneableGame', err);
+        throw err;
+      }
+
       if (row === undefined) {
         return cb(new Error('Game not found'), undefined);
       }
@@ -96,8 +122,7 @@ export class SQLite implements IDatabase {
         return cb(err ?? undefined, json);
       } catch (exception) {
         console.error(`unable to load game ${game_id} at first save point`, exception);
-        cb(exception, undefined);
-        return;
+        return cb(exception, undefined);
       }
     });
   }
@@ -141,20 +166,23 @@ export class SQLite implements IDatabase {
     // DELETE all saves except initial and last one
     this.db.get('SELECT first_save_id, current_save_id FROM games WHERE game_id = ?', [game_id], (err: Error | null, row: { first_save_id: any, current_save_id: any }) => {
       if (err) {
-        return console.warn(err.message);
+        console.error('SQLite:cleanSaves', err.message);
+        throw err;
       }
       if (row === undefined) {
         return console.warn(`Couldn't find game ${game_id} to cleanSaves`);
       }
       this.db.run(`DELETE FROM saves WHERE game_id = ? AND save_id != ? AND save_id != ?`, [game_id, row.current_save_id, row.first_save_id], function(err: Error | null) {
         if (err) {
-          return console.warn(err.message);
+          console.error('SQLite:cleanSaves', err.message);
+          throw err;
         }
       });
       // Flag game as finished
       this.db.run(`UPDATE games SET status = 'finished' WHERE game_id = ?`, [game_id], function(err: Error | null) {
         if (err) {
-          return console.warn(err.message);
+          console.error('SQLite:cleanSaves', err.message);
+          throw err;
         }
       });
     });
@@ -167,18 +195,21 @@ export class SQLite implements IDatabase {
     if (process.env.MAX_GAME_DAYS) {
       this.db.all(`SELECT game_id FROM games WHERE created_time < strftime('%s',date('now', '-? day')) and status = 'running'`, [process.env.MAX_GAME_DAYS], (err: Error | null, rows: Array<{ game_id : string }>) => {
         if (err) {
-          return console.warn(err?.message);
+          console.error('SQLite:purgeUnfinishedGames', err?.message);
+          throw err;
         }
         if (rows.length > 0) {
           const placeholders : string = rows.map(() => '?').join(',');
           const gameIds : Array<string> = rows.map((r) => r.game_id);
           this.db.run(`DELETE FROM saves WHERE game_id IN (${placeholders})`, gameIds, (err: Error | null) => {
             if (err) {
-              return console.warn(err?.message);
+              console.error('SQLite:purgeUnfinishedGames', err?.message);
+              throw err;
             }
             this.db.run(`DELETE FROM games WHERE game_id IN (${placeholders}) `, gameIds, function(err: Error | null) {
               if (err) {
-                return console.warn(err.message);
+                console.error('SQLite:purgeUnfinishedGames', err?.message);
+                throw err;
               }
             });
           });
@@ -190,7 +221,7 @@ export class SQLite implements IDatabase {
   restoreGame(game_id: GameId, save_id: string, cb: DbLoadCallback<Game>): void {
     this.db.get('SELECT game FROM saves WHERE game_id = ? AND save_id = ?', [game_id, save_id], (err: Error | null, row: { game: any; }) => {
       if (err) {
-        console.error(err.message);
+        console.error('SQLite:restoreGame', err.message);
         cb(err, undefined);
         return;
       }
@@ -213,17 +244,17 @@ export class SQLite implements IDatabase {
     const gameJSON = game.toJSON();
 
     // Upsert game before inserting save
-    const sql = 'INSERT INTO games (game_id, current_save_id, first_save_id, players) VALUES (?, ?, ?, ?) ON CONFLICT (game_id) DO UPDATE SET current_game_id = ?';
+    const sql = 'INSERT INTO games (game_id, current_save_id, first_save_id, players) VALUES (?, ?, ?, ?) ON CONFLICT (game_id) DO UPDATE SET current_save_id = ?';
     this.db.run(sql, [game.id, save_id, save_id, game.getPlayers().length, save_id], (err: Error | null) => {
       if (err) {
-        console.error(err.message);
-        return;
+        console.error('SQLite:saveGame', err.message);
+        throw err;
       }
 
       this.db.run('INSERT INTO saves (game_id, save_id, game) VALUES ($1, $2, $3)', [game.id, save_id, gameJSON], function(err: Error | null) {
         if (err) {
-          console.error(err.message);
-          return;
+          console.error('SQLite:saveGame', err.message);
+          throw err;
         }
       });
     });
@@ -235,7 +266,8 @@ export class SQLite implements IDatabase {
     }
     this.db.get('SELECT game FROM saves WHERE game_id = ? AND save_id = ?', [game_id, fromSaveId], (err: Error | null, row: { game: any; }) => {
       if (err) {
-        return console.warn(err.message);
+        console.error('SQLite:deleteGameNbrSaves', err.message);
+        throw err;
       }
       const json = JSON.parse(row.game);
       const parent = json.parentSaveId ?? null;
@@ -244,14 +276,16 @@ export class SQLite implements IDatabase {
       }
       this.db.run('DELETE FROM saves WHERE game_id = ? AND save_id = ?', [game_id, fromSaveId], (err: Error | null) => {
         if (err) {
-          return console.warn(err.message);
+          console.error('SQLite:deleteGameNbrSaves', err.message);
+          throw err;
         }
         if (rollbackCount > 1 && parent !== null) {
           this.deleteGameNbrSaves(game_id, parent as string, rollbackCount - 1);
         } else {
           this.db.run('UPDATE games SET current_save_id = ? WHERE game_id = ?', [parent, game_id], function(err: Error | null) {
             if (err) {
-              return console.warn(err.message);
+              console.error('SQLite:deleteGameNbrSaves', err.message);
+              throw err;
             }
           });
         }

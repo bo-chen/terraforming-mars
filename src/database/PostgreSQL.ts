@@ -28,7 +28,7 @@ export class PostgreSQL implements IDatabase {
         first_save_id VARCHAR,
         current_save_id VARCHAR,
         status TEXT DEFAULT 'running', 
-        created_time TIMESTAMP NOT NULL DEFAULT now(),
+        created_time TIMESTAMP NOT NULL DEFAULT now()
       )`);
     this.client.query(
       `CREATE TABLE IF NOT EXISTS saves(
@@ -47,7 +47,7 @@ export class PostgreSQL implements IDatabase {
         game_options JSONB NOT NULL, 
         scores JSONB NOT NULL
       )`);
-    this.client.query('CREATE INDEX IF NOT EXISTS games_created_time_index on games(created_time )', (err) => {
+    this.client.query('CREATE INDEX IF NOT EXISTS games_created_time_index on games(created_time)', (err) => {
       if (err) {
         throw err;
       }
@@ -256,7 +256,7 @@ export class PostgreSQL implements IDatabase {
     const gameJSON = game.toJSON();
 
     // Upsert game before inserting save
-    const sql = 'INSERT INTO games (game_id, current_save_id, first_save_id, players) VALUES ($1, $2, $2, $3) ON CONFLICT (game_id) DO UPDATE SET current_game_id = $2';
+    const sql = 'INSERT INTO games (game_id, current_save_id, first_save_id, players) VALUES ($1, $2, $2, $3) ON CONFLICT (game_id) DO UPDATE SET current_save_id = $2';
     this.client.query(sql, [game.id, save_id, game.getPlayers().length], (err) => {
       if (err) {
         console.error('PostgreSQL:saveGame', err);
