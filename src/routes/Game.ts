@@ -7,6 +7,7 @@ import {Cloner} from '../database/Cloner';
 import {GameLoader} from '../database/GameLoader';
 import {Game} from '../Game';
 import {Player} from '../Player';
+import {Random} from '../random';
 import {Server} from '../models/ServerModel';
 import {ServeAsset} from './ServeAsset';
 
@@ -15,11 +16,6 @@ export class GameHandler extends Handler {
   public static readonly INSTANCE = new GameHandler();
   private constructor() {
     super();
-  }
-
-  public generateRandomId(prefix: string): string {
-    // 281474976710656 possible values.
-    return prefix + Math.floor(Math.random() * Math.pow(16, 12)).toString(16);
   }
 
   public get(req: http.IncomingMessage, res: http.ServerResponse, ctx: IContext): void {
@@ -37,15 +33,15 @@ export class GameHandler extends Handler {
     req.once('end', () => {
       try {
         const gameReq = JSON.parse(body);
-        const gameId = this.generateRandomId('g');
-        const spectatorId = this.generateRandomId('s');
+        const gameId = Random.generateRandomId('g');
+        const spectatorId = Random.generateRandomId('s');
         const players = gameReq.players.map((obj: any) => {
           return new Player(
             obj.name,
             obj.color,
             obj.beginner,
             Number(obj.handicap), // For some reason handicap is coming up a string.
-            this.generateRandomId('p'),
+            Random.generateRandomId('p'),
           );
         });
         let firstPlayerIdx: number = 0;

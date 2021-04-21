@@ -1,7 +1,7 @@
-import {DbLoadCallback, IDatabase} from './IDatabase';
+import {DbLoadCallback, IDatabase, IGameData} from './IDatabase';
 import {Game, GameId, GameOptions, SaveId, Score} from '../Game';
-import {IGameData} from './IDatabase';
 import {SerializedGame} from '../SerializedGame';
+
 import {Dirent} from 'fs';
 
 const path = require('path');
@@ -37,21 +37,15 @@ export class Localfilesystem implements IDatabase {
     return path.resolve(startFolder, `game-${gameId}.json`);
   }
 
-  // TODO(Bo) Both this and the copy in GameHandler should probably be moved to Game.ts
-  public generateRandomId(prefix: string): string {
-    // 281474976710656 possible values.
-    return prefix + Math.floor(Math.random() * Math.pow(16, 12)).toString(16);
-  }
-
-  saveGame(game: Game): void {
+  saveGame(game: Game, newSaveId: SaveId): void {
     // Start of a game if it's never been saved before
     const start = (game.saveId === undefined);
 
     // Set new save_id before saving
     game.parentSaveId = game.saveId;
-    game.saveId = this.generateRandomId('v');
+    game.saveId = newSaveId;
 
-    console.log(`saving ${game.id} at position ${game.saveId}`);
+    console.log(`saving ${game.id} at position ${newSaveId}`);
     this.saveSerializedGame(game.serialize(), start);
   }
 

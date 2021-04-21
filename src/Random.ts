@@ -17,4 +17,9 @@ export class Random {
     public nextInt(range: number): number {
       return Math.floor(this.next() * range);
     }
+
+    public static generateRandomId(prefix: string): string {
+      // 281474976710656 possible values.
+      return prefix + Math.floor(Math.random() * Math.pow(16, 12)).toString(16);
+    }
 }

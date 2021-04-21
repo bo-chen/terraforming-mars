@@ -235,23 +235,22 @@ export class SQLite implements IDatabase {
     });
   }
 
-  saveGame(game: Game): void {
+  saveGame(game: Game, newSaveId: SaveId): void {
     // Set new save_id before saving to db
     game.parentSaveId = game.saveId;
-    game.saveId = this.generateRandomId('v');
-    const save_id = game.saveId;
+    game.saveId = newSaveId;
 
     const gameJSON = game.toJSON();
 
     // Upsert game before inserting save
     const sql = 'INSERT INTO games (game_id, current_save_id, first_save_id, players) VALUES (?, ?, ?, ?) ON CONFLICT (game_id) DO UPDATE SET current_save_id = ?';
-    this.db.run(sql, [game.id, save_id, save_id, game.getPlayers().length, save_id], (err: Error | null) => {
+    this.db.run(sql, [game.id, newSaveId, newSaveId, game.getPlayers().length, newSaveId], (err: Error | null) => {
       if (err) {
         console.error('SQLite:saveGame', err.message);
         throw err;
       }
 
-      this.db.run('INSERT INTO saves (game_id, save_id, game) VALUES ($1, $2, $3)', [game.id, save_id, gameJSON], function(err: Error | null) {
+      this.db.run('INSERT INTO saves (game_id, save_id, game) VALUES ($1, $2, $3)', [game.id, newSaveId, gameJSON], function(err: Error | null) {
         if (err) {
           console.error('SQLite:saveGame', err.message);
           throw err;
@@ -291,11 +290,5 @@ export class SQLite implements IDatabase {
         }
       });
     });
-  }
-
-  // TODO(Bo) Both this and the copy in GameHandler should probably be moved to Game.ts
-  public generateRandomId(prefix: string): string {
-    // 281474976710656 possible values.
-    return prefix + Math.floor(Math.random() * Math.pow(16, 12)).toString(16);
   }
 }

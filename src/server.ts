@@ -24,6 +24,7 @@ import {Load} from './routes/Load';
 import {LoadGame} from './routes/LoadGame';
 import {Route} from './routes/Route';
 import {PlayerInput} from './routes/PlayerInput';
+import {Random} from './Random';
 import {ServeApp} from './routes/ServeApp';
 import {ServeAsset} from './routes/ServeAsset';
 
@@ -31,7 +32,7 @@ process.on('uncaughtException', (err: any) => {
   console.error('UNCAUGHT EXCEPTION', err);
 });
 
-const serverId = process.env.SERVER_ID || GameHandler.INSTANCE.generateRandomId('');
+const serverId = process.env.SERVER_ID || Random.generateRandomId('');
 const route = new Route();
 
 const handlers: Map<string, IHandler> = new Map(

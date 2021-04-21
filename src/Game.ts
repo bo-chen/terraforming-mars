@@ -388,7 +388,7 @@ export class Game implements ISerializable<SerializedGame> {
   }
 
   public save(): void {
-    Database.getInstance().saveGame(this);
+    Database.getInstance().saveGame(this, Random.generateRandomId('v'));
   }
 
   public toJSON(): string {
