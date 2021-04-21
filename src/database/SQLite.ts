@@ -236,27 +236,46 @@ export class SQLite implements IDatabase {
   }
 
   saveGame(game: Game, newSaveId: SaveId): void {
-    // Set new save_id before saving to db
+    // The flow is a bit different for first saves -- where the game reference also needs to be created.
+    const firstSave = game.saveId === undefined;
+
+    // Set new save_id before saving to db.
     game.parentSaveId = game.saveId;
     game.saveId = newSaveId;
 
     const gameJSON = game.toJSON();
 
-    // Upsert game before inserting save
-    const sql = 'INSERT INTO games (game_id, current_save_id, first_save_id, players) VALUES (?, ?, ?, ?) ON CONFLICT (game_id) DO UPDATE SET current_save_id = ?';
-    this.db.run(sql, [game.id, newSaveId, newSaveId, game.getPlayers().length, newSaveId], (err: Error | null) => {
-      if (err) {
-        console.error('SQLite:saveGame', err.message);
-        throw err;
-      }
-
-      this.db.run('INSERT INTO saves (game_id, save_id, game) VALUES ($1, $2, $3)', [game.id, newSaveId, gameJSON], function(err: Error | null) {
+    if (firstSave) {
+      // Insert game before inserting save for first save.
+      const sql = 'INSERT INTO games (game_id, current_save_id, first_save_id, players) VALUES (?, ?, ?, ?)';
+      this.db.run(sql, [game.id, newSaveId, newSaveId, game.getPlayers().length], (err: Error | null) => {
         if (err) {
           console.error('SQLite:saveGame', err.message);
           throw err;
         }
+
+        this.db.run('INSERT INTO saves (game_id, save_id, game) VALUES ($1, $2, $3)', [game.id, newSaveId, gameJSON], function(err: Error | null) {
+          if (err) {
+            console.error('SQLite:saveGame', err.message);
+            throw err;
+          }
+        });
       });
-    });
+    } else {
+      // For most saves, it's better to insert the save first before updating game.
+      this.db.run('INSERT INTO saves (game_id, save_id, game) VALUES ($1, $2, $3)', [game.id, newSaveId, gameJSON], (err: Error | null) => {
+        if (err) {
+          console.error('SQLite:saveGame', err.message);
+          throw err;
+        }
+        this.db.run('UPDATE games SET current_save_id = ? WHERE game_id = ?', [newSaveId, game.id], (err: Error | null) => {
+          if (err) {
+            console.error('SQLite:saveGame', err.message);
+            throw err;
+          }
+        });
+      });
+    }
   }
 
   deleteGameNbrSaves(game_id: GameId, fromSaveId : SaveId, rollbackCount: number): void {

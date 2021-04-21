@@ -249,26 +249,45 @@ export class PostgreSQL implements IDatabase {
   }
 
   saveGame(game: Game, newSaveId: SaveId): void {
+    // The flow is a bit different for first saves -- where the game reference also needs to be created
+    const firstSave = (game.saveId === undefined);
+
     // Set new save_id before saving to db
     game.parentSaveId = game.saveId;
     game.saveId = newSaveId;
 
     const gameJSON = game.toJSON();
 
-    // Upsert game before inserting save
-    const sql = 'INSERT INTO games (game_id, current_save_id, first_save_id, players) VALUES ($1, $2, $2, $3) ON CONFLICT (game_id) DO UPDATE SET current_save_id = $2';
-    this.client.query(sql, [game.id, newSaveId, game.getPlayers().length], (err) => {
-      if (err) {
-        console.error('PostgreSQL:saveGame', err);
-        return;
-      }
-      this.client.query('INSERT INTO saves (game_id, save_id, game) VALUES ($1, $2, $3)', [game.id, newSaveId, gameJSON], (err) => {
+    if (firstSave) {
+      // Insert game before inserting save for first save.
+      const sql = 'INSERT INTO games (game_id, current_save_id, first_save_id, players) VALUES ($1, $2, $2, $3)';
+      this.client.query(sql, [game.id, newSaveId, game.getPlayers().length], (err) => {
         if (err) {
-          console.error('PostgreSQL:saveGame', err);
+          console.error('PostgreSQL:saveGame1', err);
           return;
         }
+        this.client.query('INSERT INTO saves (game_id, save_id, game) VALUES ($1, $2, $3)', [game.id, newSaveId, gameJSON], (err) => {
+          if (err) {
+            console.error('PostgreSQL:saveGame2', err);
+            return;
+          }
+        });
       });
-    });
+    } else {
+      // For most saves, it's better to insert the save first before updating game.
+      this.client.query('INSERT INTO saves (game_id, save_id, game) VALUES ($1, $2, $3)', [game.id, newSaveId, gameJSON], (err) => {
+        if (err) {
+          console.error('PostgreSQL:saveGame3', err);
+          return;
+        }
+        this.client.query('UPDATE games SET current_save_id = $1 WHERE game_id = $2', [newSaveId, game.id], (err) => {
+          if (err) {
+            console.error('PostgreSQL:saveGame4', err);
+            return;
+          }
+        });
+      });
+    }
   }
 
   deleteGameNbrSaves(game_id: GameId, fromSaveId : SaveId, rollbackCount: number): void {
