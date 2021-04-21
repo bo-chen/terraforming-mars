@@ -1,5 +1,5 @@
 import {DbLoadCallback, IDatabase} from './IDatabase';
-import {Game, GameId, GameOptions, Score} from '../Game';
+import {Game, GameId, GameOptions, SaveId, Score} from '../Game';
 import {IGameData} from './IDatabase';
 import {SerializedGame} from '../SerializedGame';
 import {Dirent} from 'fs';
@@ -24,16 +24,16 @@ export class Localfilesystem implements IDatabase {
     }
   }
 
-  _filename(gameId: string): string {
+  _filename(gameId: GameId): string {
     return path.resolve(dbFolder, `game-${gameId}.json`);
   }
 
-  _historyFilename(gameId: string, saveId: string) {
+  _historyFilename(gameId: GameId, saveId: SaveId) {
     const saveIdString = saveId.toString().padStart(5, '0');
     return path.resolve(historyFolder, `game-${gameId}-${saveIdString}.json`);
   }
 
-  _startFilename(gameId: string): string {
+  _startFilename(gameId: GameId): string {
     return path.resolve(startFolder, `game-${gameId}.json`);
   }
 
@@ -75,7 +75,7 @@ export class Localfilesystem implements IDatabase {
     }
   }
 
-  getGameVersion(_game_id: GameId, _save_id: string, _cb: DbLoadCallback<SerializedGame>): void {
+  getGameVersion(_game_id: GameId, _save_id: SaveId, _cb: DbLoadCallback<SerializedGame>): void {
     throw new Error('Not implemented');
   }
 
@@ -128,7 +128,7 @@ export class Localfilesystem implements IDatabase {
     // Not implemented
   }
 
-  cleanSaves(_game_id: GameId, _save_id: string): void {
+  cleanSaves(_game_id: GameId, _save_id: SaveId): void {
     // Not implemented here.
   }
 
@@ -136,11 +136,11 @@ export class Localfilesystem implements IDatabase {
     // Not implemented.
   }
 
-  restoreGame(_game_id: GameId, _save_id: string, _cb: DbLoadCallback<Game>): void {
+  restoreGame(_game_id: GameId, _save_id: SaveId, _cb: DbLoadCallback<Game>): void {
     throw new Error('Undo not yet implemented');
   }
 
-  deleteGameNbrSaves(_game_id: GameId, _fromSaveId : string, _rollbackCount: number): void {
+  deleteGameNbrSaves(_game_id: GameId, _fromSaveId : SaveId, _rollbackCount: number): void {
     throw new Error('Rollback not yet implemented');
   }
 }

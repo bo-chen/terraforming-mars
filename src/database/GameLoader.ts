@@ -70,7 +70,7 @@ export class GameLoader implements IGameLoader {
     }
   }
 
-  public getLoadedGameIds(): Array<string> {
+  public getLoadedGameIds(): Array<GameId> {
     return Array.from(this.games.keys());
   }
 

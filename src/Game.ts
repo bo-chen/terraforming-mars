@@ -69,6 +69,7 @@ import {Multiset} from './utils/Multiset';
 
 export type GameId = string;
 export type SpectatorId = string;
+export type SaveId = string;
 
 export interface Score {
   corporation: String;
@@ -153,9 +154,9 @@ const DEFAULT_GAME_OPTIONS: GameOptions = {
 
 export class Game implements ISerializable<SerializedGame> {
   // Game-level data
-  public saveId: string | undefined;
-  public parentSaveId: string | undefined;
-  private clonedGamedId: string | undefined;
+  public saveId: SaveId | undefined;
+  public parentSaveId: SaveId | undefined;
+  private clonedGamedId: GameId | undefined;
   public seed: number;
   public spectatorId: SpectatorId | undefined;
   public deferredActions: DeferredActionsQueue = new DeferredActionsQueue();

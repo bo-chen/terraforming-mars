@@ -1,4 +1,4 @@
-import {Game, GameId, GameOptions, Score} from '../Game';
+import {Game, GameId, GameOptions, SaveId, Score} from '../Game';
 import {SerializedGame} from '../SerializedGame';
 
 export interface IGameData {
@@ -47,12 +47,12 @@ export interface IDatabase {
      * @param game_id the game id to load
      * @param cb called with game if exists, if game is undefined err will be truthy
      */
-    getGame(game_id: string, cb: (err: Error | undefined, game?: SerializedGame) => void): void;
+    getGame(game_id: GameId, cb: (err: Error | undefined, game?: SerializedGame) => void): void;
 
     /**
      * Load a game at a specific save point.
      */
-    getGameVersion(game_id: GameId, save_id: string, cb: DbLoadCallback<SerializedGame>): void;
+    getGameVersion(game_id: GameId, save_id: SaveId, cb: DbLoadCallback<SerializedGame>): void;
 
     /**
      * Return a list of all `game_id`s.
@@ -99,7 +99,7 @@ export interface IDatabase {
      * The meat behind player undo. Loads the game at the given save point,
      * and provides it in the callback.
      */
-    restoreGame(game_id: GameId, save_id: string, cb: DbLoadCallback<Game>): void;
+    restoreGame(game_id: GameId, save_id: SaveId, cb: DbLoadCallback<Game>): void;
 
     /**
      * Load a game at save point 0, and provide it in the callback.
@@ -111,7 +111,7 @@ export interface IDatabase {
      *
      * Accessible by the administrative API to roll back a broken game.
      */
-    deleteGameNbrSaves(game_id: GameId, fromSaveId : string, rollbackCount: number): void;
+    deleteGameNbrSaves(game_id: GameId, fromSaveId : SaveId, rollbackCount: number): void;
 
     /**
      * A maintenance task on a single game to close it out upon its completion.
@@ -126,7 +126,7 @@ export interface IDatabase {
     // TODO(kberg): rename to represent that it's closing out
     // this game. Also consider not needing the save_id, and
     // also to make the maintenance behavior a first-class method.
-    cleanSaves(game_id: GameId, save_id: string): void;
+    cleanSaves(game_id: GameId, save_id: SaveId): void;
 
     /**
      * A maintenance task that purges abandoned solo games older

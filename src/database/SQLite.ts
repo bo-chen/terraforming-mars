@@ -1,5 +1,5 @@
 import {DbLoadCallback, IDatabase} from './IDatabase';
-import {Game, GameId, GameOptions, Score} from '../Game';
+import {Game, GameId, GameOptions, SaveId, Score} from '../Game';
 import {IGameData} from './IDatabase';
 import {SerializedGame} from '../SerializedGame';
 
@@ -153,7 +153,7 @@ export class SQLite implements IDatabase {
     });
   }
 
-  getGameVersion(game_id: GameId, save_id: string, cb: DbLoadCallback<SerializedGame>): void {
+  getGameVersion(game_id: GameId, save_id: SaveId, cb: DbLoadCallback<SerializedGame>): void {
     this.db.get('SELECT game FROM saves WHERE game_id = ? AND save_id = ?', [game_id, save_id], (err: Error | null, row: { game: any; }) => {
       if (err) {
         return cb(err ?? undefined, undefined);
@@ -162,7 +162,7 @@ export class SQLite implements IDatabase {
     });
   }
 
-  cleanSaves(game_id: GameId, _save_id: string): void {
+  cleanSaves(game_id: GameId, _save_id: SaveId): void {
     // DELETE all saves except initial and last one
     this.db.get('SELECT first_save_id, current_save_id FROM games WHERE game_id = ?', [game_id], (err: Error | null, row: { first_save_id: any, current_save_id: any }) => {
       if (err) {
@@ -200,7 +200,7 @@ export class SQLite implements IDatabase {
         }
         if (rows.length > 0) {
           const placeholders : string = rows.map(() => '?').join(',');
-          const gameIds : Array<string> = rows.map((r) => r.game_id);
+          const gameIds : Array<GameId> = rows.map((r) => r.game_id);
           this.db.run(`DELETE FROM saves WHERE game_id IN (${placeholders})`, gameIds, (err: Error | null) => {
             if (err) {
               console.error('SQLite:purgeUnfinishedGames', err?.message);
@@ -218,7 +218,7 @@ export class SQLite implements IDatabase {
     }
   }
 
-  restoreGame(game_id: GameId, save_id: string, cb: DbLoadCallback<Game>): void {
+  restoreGame(game_id: GameId, save_id: SaveId, cb: DbLoadCallback<Game>): void {
     this.db.get('SELECT game FROM saves WHERE game_id = ? AND save_id = ?', [game_id, save_id], (err: Error | null, row: { game: any; }) => {
       if (err) {
         console.error('SQLite:restoreGame', err.message);
@@ -260,7 +260,7 @@ export class SQLite implements IDatabase {
     });
   }
 
-  deleteGameNbrSaves(game_id: GameId, fromSaveId : string, rollbackCount: number): void {
+  deleteGameNbrSaves(game_id: GameId, fromSaveId : SaveId, rollbackCount: number): void {
     if (rollbackCount <= 0) {
       return;
     }
@@ -280,7 +280,7 @@ export class SQLite implements IDatabase {
           throw err;
         }
         if (rollbackCount > 1 && parent !== null) {
-          this.deleteGameNbrSaves(game_id, parent as string, rollbackCount - 1);
+          this.deleteGameNbrSaves(game_id, parent as SaveId, rollbackCount - 1);
         } else {
           this.db.run('UPDATE games SET current_save_id = ? WHERE game_id = ?', [parent, game_id], function(err: Error | null) {
             if (err) {
