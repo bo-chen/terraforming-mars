@@ -12,12 +12,13 @@ export class ApiGame extends Handler {
 
   public get(req: http.IncomingMessage, res: http.ServerResponse, ctx: IContext): void {
     const gameId = ctx.url.searchParams.get('id');
+    const saveId = ctx.url.searchParams.get('save-id');
     if (!gameId) {
       ctx.route.notFound(req, res, 'id parameter missing');
       return;
     }
 
-    ctx.gameLoader.getByGameId(gameId, false, (game: Game | undefined) => {
+    ctx.gameLoader.getByGameId(gameId, saveId, false, (game: Game | undefined) => {
       if (game === undefined) {
         ctx.route.notFound(req, res, 'game not found');
         return;

@@ -1,4 +1,4 @@
-import {Game, GameId, SpectatorId} from '../Game';
+import {Game, GameId, SaveId, SpectatorId} from '../Game';
 import {PlayerId} from '../Player';
 
 type LoadCallback = (game: Game | undefined) => void;
@@ -16,7 +16,7 @@ export interface IGameLoader {
    * @param {boolean} bypassCache always pull from database
    * @param {LoadCallback} cb called with game when available
    */
-  getByGameId(gameId: GameId, bypassCache: boolean, cb: LoadCallback): void;
+  getByGameId(gameId: GameId, saveId: SaveId | null, bypassCache: boolean, cb: LoadCallback): void;
   getByPlayerId(playerId: PlayerId, cb: LoadCallback): void;
   getBySpectatorId(spectatorId: SpectatorId, cb: LoadCallback): void;
   rollbackGameOnce(originalGame: Game, cb: LoadCallback): void;

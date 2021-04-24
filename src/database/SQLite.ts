@@ -13,12 +13,12 @@ export class SQLite implements IDatabase {
   private db: sqlite3.Database;
 
   constructor() {
-    // Create the table that will store every saves if not exists
+    // Create the tables if not exists.
     if (!fs.existsSync(dbFolder)) {
       fs.mkdirSync(dbFolder);
     }
     this.db = new sqlite3.Database(dbPath);
-    // Don't set foreign key for current_save_id and first_save_id so it's easier to delete
+    // Don't set foreign key for current_save_id and first_save_id so it's easier to delete. The trade-off is the lack of referential integrity.
     this.db.run(
       `CREATE TABLE IF NOT EXISTS games(
         game_id VARCHAR PRIMARY KEY, 

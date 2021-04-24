@@ -24,15 +24,16 @@ export class LoadGame extends Handler {
         // This should probably be behind some kind of verification that prevents just
         // anyone from rolling back a large number of steps.
         const rollbackCount = gameReq.rollbackCount;
-        GameLoader.getInstance().getByGameId(game_id, true, (game) => {
+        GameLoader.getInstance().getByGameId(game_id, null, true, (game) => {
           if (game === undefined) {
             console.warn(`unable to find ${game_id} in database`);
             ctx.route.notFound(req, res, 'game_id not found');
             return;
           }
           if (rollbackCount > 0) {
-            Database.getInstance().deleteGameNbrSaves(game_id, game.parentSaveId!, rollbackCount);
-            GameLoader.getInstance().getByGameId(game_id, true, (restoredGame) => {
+            Database.getInstance().deleteGameNbrSaves(game_id, game.saveId!, rollbackCount);
+            // TODO(bo-chen) This won't work properly without a callback through deleteGameNbrSaves.
+            GameLoader.getInstance().getByGameId(game_id, game.parentSaveId!, true, (restoredGame) => {
               ctx.route.writeJson(res, Server.getGameModel(restoredGame!));
             });
           } else {

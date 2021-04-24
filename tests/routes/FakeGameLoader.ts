@@ -9,7 +9,7 @@ export class FakeGameLoader implements IGameLoader {
   getLoadedGameIds(): string[] {
     return Array.from(this.games.keys());
   }
-  getByGameId(gameId: string, _bypassCache: boolean, cb: (game: Game | undefined) => void): void {
+  getByGameId(gameId: string, _saveId: string | null, _bypassCache: boolean, cb: (game: Game | undefined) => void): void {
     cb(this.games.get(gameId));
   }
   getByPlayerId(playerId: string, cb: (game: Game | undefined) => void): void {

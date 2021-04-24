@@ -1,5 +1,5 @@
 import {Database} from './Database';
-import {Game, GameId, SpectatorId} from '../Game';
+import {Game, GameId, SaveId, SpectatorId} from '../Game';
 import {PlayerId} from '../Player';
 import {IGameLoader} from './IGameLoader';
 
@@ -74,13 +74,13 @@ export class GameLoader implements IGameLoader {
     return Array.from(this.games.keys());
   }
 
-  public getByGameId(gameId: GameId, bypassCache: boolean, cb: LoadCallback): void {
+  public getByGameId(gameId: GameId, saveId: SaveId, bypassCache: boolean, cb: LoadCallback): void {
     this.loadAllGameIds();
-    if (bypassCache === false && this.games.get(gameId) !== undefined) {
+    if (bypassCache === false && saveId === null && this.games.get(gameId) !== undefined) {
       cb(this.games.get(gameId));
     } else if (this.games.has(gameId) || this.state !== State.READY) {
       this.onGameIdsLoaded.unshift(() => {
-        this.loadGame(gameId, bypassCache, this.onGameLoaded(cb));
+        this.loadGame(gameId, saveId, bypassCache, this.onGameLoaded(cb));
       });
       this.runGameIdLoadedCallback();
     } else {
@@ -139,14 +139,15 @@ export class GameLoader implements IGameLoader {
     }
   }
 
-  private loadGame(gameId: GameId, bypassCache: boolean, cb: LoadCallback): void {
+  private loadGame(gameId: GameId, saveId: SaveId | null, bypassCache: boolean, cb: LoadCallback): void {
     this.loadingGame = true;
-    if (bypassCache === false && this.games.get(gameId) !== undefined) {
+    if (bypassCache === false && saveId === null && this.games.get(gameId) !== undefined) {
       cb(this.games.get(gameId));
     } else if (this.games.has(gameId) === false) {
       console.warn(`GameLoader:game id not found ${gameId}`);
       cb(undefined);
-    } else {
+    } else if (saveId === null) {
+      // Load most recent save.
       Database.getInstance().getGame(gameId, (err: any, serializedGame?) => {
         if (err || (serializedGame === undefined)) {
           console.error('GameLoader:loadGame', err);
@@ -157,6 +158,25 @@ export class GameLoader implements IGameLoader {
           const game = Game.deserialize(serializedGame);
           this.add(game);
           console.log(`GameLoader loaded game ${gameId} into memory from database`);
+          cb(game);
+        } catch (e) {
+          console.error('GameLoader:loadGame', e);
+          cb(undefined);
+          return;
+        }
+      });
+    } else {
+      // Load at save id.
+      Database.getInstance().getGameVersion(gameId, saveId, (err: any, serializedGame?) => {
+        if (err || (serializedGame === undefined)) {
+          console.error('GameLoader:loadGame', err);
+          cb(undefined);
+          return;
+        }
+        try {
+          const game = Game.deserialize(serializedGame);
+          this.add(game);
+          console.log(`GameLoader loaded game (${gameId},${saveId}) into memory from database`);
           cb(game);
         } catch (e) {
           console.error('GameLoader:loadGame', e);
@@ -179,7 +199,7 @@ export class GameLoader implements IGameLoader {
       cb(this.games.get(gameId));
       return;
     }
-    this.loadGame(gameId, false, cb);
+    this.loadGame(gameId, null, false, cb);
   }
 
   private onGameLoaded(cb: LoadCallback) {
