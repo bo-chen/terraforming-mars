@@ -224,30 +224,6 @@ export class PostgreSQL implements IDatabase {
     });
   }
 
-  restoreGame(game_id: GameId, save_id: SaveId, cb: DbLoadCallback<Game>): void {
-    // Retrieve last save from database
-    this.client.query('SELECT game FROM saves WHERE game_id = $1 AND save_id = $2', [game_id, save_id], (err, res) => {
-      if (err) {
-        console.error('PostgreSQL:restoreGame', err);
-        cb(err, undefined);
-        return;
-      }
-      if (res.rows.length === 0) {
-        console.error('PostgreSQL:restoreGame', `Game ${game_id} not found`);
-        cb(err, undefined);
-        return;
-      }
-      try {
-        // Transform string to json
-        const json = JSON.parse(res.rows[0].game);
-        const game = Game.deserialize(json);
-        cb(undefined, game);
-      } catch (err) {
-        cb(err, undefined);
-      }
-    });
-  }
-
   saveGame(game: Game, newSaveId: SaveId): void {
     // The flow is a bit different for first saves -- where the game reference also needs to be created
     const firstSave = (game.saveId === undefined);

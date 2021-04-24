@@ -96,12 +96,6 @@ export interface IDatabase {
     saveGameResults(game_id: GameId, players: number, generations: number, gameOptions: GameOptions, scores: Array<Score>): void;
 
     /**
-     * The meat behind player undo. Loads the game at the given save point,
-     * and provides it in the callback.
-     */
-    restoreGame(game_id: GameId, save_id: SaveId, cb: DbLoadCallback<Game>): void;
-
-    /**
      * Load a game at save point 0, and provide it in the callback.
      */
     loadCloneableGame(game_id: GameId, cb: DbLoadCallback<SerializedGame>): void;

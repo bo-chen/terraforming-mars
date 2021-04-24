@@ -218,23 +218,6 @@ export class SQLite implements IDatabase {
     }
   }
 
-  restoreGame(game_id: GameId, save_id: SaveId, cb: DbLoadCallback<Game>): void {
-    this.db.get('SELECT game FROM saves WHERE game_id = ? AND save_id = ?', [game_id, save_id], (err: Error | null, row: { game: any; }) => {
-      if (err) {
-        console.error('SQLite:restoreGame', err.message);
-        cb(err, undefined);
-        return;
-      }
-      try {
-        const json = JSON.parse(row.game);
-        const game = Game.deserialize(json);
-        cb(undefined, game);
-      } catch (err) {
-        cb(err, undefined);
-      }
-    });
-  }
-
   saveGame(game: Game, newSaveId: SaveId): void {
     // The flow is a bit different for first saves -- where the game reference also needs to be created.
     const firstSave = game.saveId === undefined;

@@ -114,10 +114,6 @@ export class Localfilesystem implements IDatabase {
     cb(undefined, gameIds);
   }
 
-  restoreReferenceGame(_gameId: GameId, cb: DbLoadCallback<Game>) {
-    cb(new Error('Does not work'), undefined);
-  }
-
   saveGameResults(_game_id: GameId, _players: number, _generations: number, _gameOptions: GameOptions, _scores: Array<Score>): void {
     // Not implemented
   }
@@ -128,10 +124,6 @@ export class Localfilesystem implements IDatabase {
 
   purgeUnfinishedGames(): void {
     // Not implemented.
-  }
-
-  restoreGame(_game_id: GameId, _save_id: SaveId, _cb: DbLoadCallback<Game>): void {
-    throw new Error('Undo not yet implemented');
   }
 
   deleteGameNbrSaves(_game_id: GameId, _fromSaveId : SaveId, _rollbackCount: number): void {

@@ -116,14 +116,20 @@ export class GameLoader implements IGameLoader {
       const originalGameId = originalGame.id;
       const originalSaveId = originalGame.saveId!;
       const originalParentId = originalGame.parentSaveId!;
-      Database.getInstance().restoreGame(originalGameId, originalParentId, (err, game) => {
-        if (game !== undefined) {
+      Database.getInstance().getGameVersion(originalGameId, originalParentId, (err : any, serializedGame?) => {
+        if (serializedGame === undefined) {
+          console.error(err);
+          cb(undefined);
+          return;
+        }
+        try {
           Database.getInstance().deleteGameNbrSaves(originalGameId, originalSaveId, 1);
+          const game = Game.deserialize(serializedGame);
           this.add(game);
           game.undoCount++;
           cb(game);
-        } else {
-          console.log(err);
+        } catch (err) {
+          console.error(err);
           cb(undefined);
         }
       });
