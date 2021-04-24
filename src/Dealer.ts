@@ -57,6 +57,10 @@ export class Dealer implements ISerializable<SerializedDealer> {
       return result;
     }
 
+    public shuffleDeck() {
+      this.deck = Dealer.shuffle(this.deck);
+    }
+
     public drawProjectCardsByCondition(game: Game, total: number, include: (card: IProjectCard) => boolean) {
       const result: Array<IProjectCard> = [];
       const discardedCards = new Set<CardName>();
